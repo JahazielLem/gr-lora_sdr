@@ -69,6 +69,11 @@ namespace gr
         {
         }
 
+        void modulate_impl::set_sf(uint8_t sf)
+        {
+            update_var(sf, m_bw);
+        }
+
         void
         modulate_impl::forecast(int noutput_items, gr_vector_int &ninput_items_required)
         {

@@ -23,6 +23,7 @@ class lora_sdr_lora_rx(gr.hier_block2):
                 gr.io_signature(1, 1, gr.sizeof_char*1),
         )
         self.message_port_register_hier_out("out")
+        self.message_port_register_hier_out("bytes")
 
 
         ##################################################
@@ -59,6 +60,7 @@ class lora_sdr_lora_rx(gr.hier_block2):
         # Connections
         ##################################################
         self.msg_connect((self.lora_sdr_crc_verif_0, 'msg'), (self, 'out'))
+        self.msg_connect((self.lora_sdr_crc_verif_0, 'bytes'), (self, 'bytes'))
         self.msg_connect((self.lora_sdr_header_decoder_0, 'frame_info'), (self.lora_sdr_frame_sync_0, 'frame_info'))
         self.connect((self.lora_sdr_crc_verif_0, 0), (self, 0))
         self.connect((self.lora_sdr_deinterleaver_0, 0), (self.lora_sdr_hamming_dec_0, 0))
@@ -118,4 +120,3 @@ class lora_sdr_lora_rx(gr.hier_block2):
 
     def set_soft_decoding(self, soft_decoding):
         self.soft_decoding = soft_decoding
-

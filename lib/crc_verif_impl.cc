@@ -31,6 +31,7 @@ namespace gr
                   output_crc_check(output_crc_check)
         {
             message_port_register_out(pmt::mp("msg"));
+            message_port_register_out(pmt::mp("bytes"));
             set_tag_propagation_policy(TPP_DONT);
             
         }
@@ -175,6 +176,7 @@ namespace gr
                                       << std::endl;
                     }
                     message_port_pub(pmt::intern("msg"), pmt::mp(message_str));
+                    message_port_pub(pmt::intern("bytes"), pmt::init_u8vector(m_payload_len, &in_buff[0]));
                     in_buff.erase(in_buff.begin(), in_buff.begin()+m_payload_len + 2);
                     if(output_crc_check){
                         produce(0,m_payload_len);
@@ -200,7 +202,6 @@ namespace gr
                         out[i] = in_buff[i];
                 }
                 cnt++;
-                in_buff.erase(in_buff.begin(), in_buff.begin() + m_payload_len );
                 if (print_rx_msg == ASCII)
                     std::cout << "rx msg: " << message_str << std::endl;
                 else if(print_rx_msg == HEX){
@@ -213,6 +214,8 @@ namespace gr
                     std::cout << std::endl;
                 }
                 message_port_pub(pmt::intern("msg"), pmt::mp(message_str));
+                message_port_pub(pmt::intern("bytes"), pmt::init_u8vector(m_payload_len, &in_buff[0]));
+                in_buff.erase(in_buff.begin(), in_buff.begin() + m_payload_len );
                 
                 return m_payload_len;
             }

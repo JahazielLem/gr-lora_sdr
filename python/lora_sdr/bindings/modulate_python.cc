@@ -39,6 +39,7 @@ void bind_modulate(py::module &m) {
       .def(py::init(&modulate::make), py::arg("sf"), py::arg("samp_rate"),
            py::arg("bw"), py::arg("sync_words"), py::arg("inter_frame_padd"),
            py::arg("preamble_len"), D(modulate, make))
+      .def("set_sf", &modulate::set_sf, py::arg("sf"))
 
       ;
 }

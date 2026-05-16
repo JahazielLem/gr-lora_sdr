@@ -47,10 +47,10 @@ namespace gr {
        * creating new instances.
        */
       static sptr make(uint8_t sf, uint32_t samp_rate, uint32_t bw, std::vector<uint16_t> sync_words,uint32_t inter_frame_padd, uint16_t preamble_len );
+      virtual void set_sf(uint8_t sf)=0;
     };
 
   } // namespace lora_sdr
 } // namespace gr
 
 #endif /* INCLUDED_LORA_SDR_MODULATE_H */
-

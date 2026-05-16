@@ -90,7 +90,7 @@ documentation: |-
         - Frame zero padding: number of null samples padded after each frame
 
     Inputs:
-        - in: Message of the payload to transmit
+        - in: Message of the payload to transmit as a PMT symbol, PMT u8vector, or PDU (meta . u8vector)
     Outputs
         - out: Stream of baseband complex samples that can be fed to the SDR frontend
 

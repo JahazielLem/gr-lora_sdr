@@ -17,6 +17,18 @@ def gr_cast(x):
 def np_cast(x):
     return np.complex64(x)
 
+def bytes_to_pmt(payload):
+    data = bytes(payload)
+    return pmt.init_u8vector(len(data), list(data))
+
+def pmt_to_bytes(message):
+    payload = pmt.cdr(message) if pmt.is_pair(message) else message
+    if pmt.is_u8vector(payload):
+        return bytes(pmt.u8vector_elements(payload))
+    if pmt.is_symbol(payload):
+        return pmt.symbol_to_string(payload).encode("latin-1")
+    raise TypeError("Expected PMT u8vector, symbol, or PDU (meta . u8vector)")
+
 class TagSink(gr.sync_block):
     def __init__(self):
         gr.sync_block.__init__(self, name='Tag sink', in_sig=[float], out_sig=None)

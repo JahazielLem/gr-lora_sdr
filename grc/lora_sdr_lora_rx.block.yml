@@ -79,6 +79,10 @@ outputs:
     domain: message
     dtype: message
     optional: true
+-   label: bytes
+    domain: message
+    dtype: message
+    optional: true
 -   label: out
     dtype: byte
     vlen: 1
@@ -110,7 +114,8 @@ documentation: |-
     Inputs:
         - in: Stream of complex samples
     Outputs
-        - (optional) out(msg): Message containing the received payload
+        - (optional) out(msg): Message containing the received payload as a PMT symbol for compatibility
+        - (optional) bytes(msg): Message containing the received payload as a PMT u8vector
         - (optional) out(bytes): Received payload as a stream of char (bytes), with tagged with payload length and CRC verification result.
     
     

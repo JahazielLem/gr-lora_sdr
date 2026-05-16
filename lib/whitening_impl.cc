@@ -54,9 +54,22 @@ namespace gr
             {
                 std::cout << RED << "Whitening can't have both input used simultaneously" << RESET << std::endl;
             }
-            //  payload_str.push_back(random_string(rand()%253+2));
-            // payload_str.push_back(rand()%2?"12345":"abcdefghijklmnop");
-            payload_str.push_back(pmt::symbol_to_string(message));
+
+            pmt::pmt_t payload = pmt::is_pair(message) ? pmt::cdr(message) : message;
+            if (pmt::is_u8vector(payload))
+            {
+                size_t len = 0;
+                const uint8_t *bytes = pmt::u8vector_elements(payload, len);
+                payload_str.emplace_back(reinterpret_cast<const char *>(bytes), len);
+            }
+            else if (pmt::is_symbol(payload))
+            {
+                payload_str.push_back(pmt::symbol_to_string(payload));
+            }
+            else
+            {
+                std::cout << RED << "Whitening expects PMT symbol, u8vector, or PDU (meta . u8vector)" << RESET << std::endl;
+            }
         }
         void whitening_impl::frame_info_handler(pmt::pmt_t frame_info)
         {
