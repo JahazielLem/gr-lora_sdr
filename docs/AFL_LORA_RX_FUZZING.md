@@ -92,6 +92,8 @@ afl-clang-fast++ -std=c++17 \
 
 Linux normalmente usa el mismo comando. Si tu instalación de GNU Radio no publica `pkg-config`, reemplaza `$(pkg-config ...)` por las rutas `-I`, `-L` y `-l` correspondientes.
 
+Si modificas `fuzz/afl_lora_rx_harness.cc`, vuelve a ejecutar este comando antes de lanzar `afl-fuzz`.
+
 ## Smoke test
 
 macOS:
@@ -139,6 +141,100 @@ AFL_EXIT_WHEN_DONE=1 DYLD_LIBRARY_PATH=build-afl/lib afl-fuzz \
 ```
 
 En Linux cambia `DYLD_LIBRARY_PATH` por `LD_LIBRARY_PATH`.
+
+## Error por `core_pattern`
+
+Si AFL++ aborta con un mensaje como:
+
+```text
+PROGRAM ABORT : Pipe at the beginning of 'core_pattern'
+```
+
+no es un error del harness. Linux está configurado para enviar core dumps a una utilidad externa como `apport` o `systemd-coredump`, y AFL++ no puede clasificar crashes de forma confiable.
+
+Para una corrida rápida donde aceptas que AFL++ puede perder algún crash, usa:
+
+```bash
+AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -i fuzz/corpus \
+  -o fuzz/out \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+Para fuzzing serio, cambia temporalmente `core_pattern`:
+
+```bash
+cat /proc/sys/kernel/core_pattern
+sudo sh -c 'echo core > /proc/sys/kernel/core_pattern'
+```
+
+Después ejecuta AFL++ normalmente:
+
+```bash
+LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -i fuzz/corpus \
+  -o fuzz/out \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+Cuando termines, restaura el valor original si lo necesitas. En Ubuntu suele ser algo parecido a:
+
+```bash
+sudo sh -c 'echo "|/usr/share/apport/apport %p %s %c %d %P %E" > /proc/sys/kernel/core_pattern'
+```
+
+También puedes guardar antes el valor exacto:
+
+```bash
+cat /proc/sys/kernel/core_pattern > /tmp/core_pattern.backup
+sudo sh -c 'echo core > /proc/sys/kernel/core_pattern'
+```
+
+y restaurarlo al final:
+
+```bash
+sudo sh -c "cat /tmp/core_pattern.backup > /proc/sys/kernel/core_pattern"
+```
+
+## Error por timeout en dry-run
+
+Si AFL++ aborta durante el dry-run con:
+
+```text
+PROGRAM ABORT : Test case ... results in a timeout
+```
+
+primero recompila el harness. El harness descarta entradas que no contienen al menos un símbolo LoRa completo para que los seeds mínimos terminen rápido:
+
+```bash
+afl-clang-fast++ -std=c++17 \
+  -Iinclude \
+  $(pkg-config --cflags gnuradio-runtime gnuradio-blocks) \
+  fuzz/afl_lora_rx_harness.cc \
+  -Lbuild-afl/lib \
+  -lgnuradio-lora_sdr \
+  $(pkg-config --libs gnuradio-runtime gnuradio-blocks) \
+  -o build-afl/afl_lora_rx_harness
+```
+
+Prueba el seed problemático fuera de AFL++:
+
+```bash
+time LD_LIBRARY_PATH=build-afl/lib ./build-afl/afl_lora_rx_harness fuzz/corpus/minimal_iq.seed
+```
+
+Si termina rápido fuera de AFL++ pero AFL++ sigue abortando por carga de CPU, sube el timeout:
+
+```bash
+LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -t 5000+ \
+  -i fuzz/corpus \
+  -o fuzz/out \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+El sufijo `+` le permite a AFL++ manejar casos lentos sin clasificar automáticamente todo como crash. Si incluso con `-t 5000+` el dry-run se queda colgado, elimina temporalmente el seed lento del corpus y deja solo `minimal_iq.seed` hasta tener seeds IQ válidos más pequeños.
 
 ## Corpus recomendado
 
@@ -248,4 +344,3 @@ DYLD_LIBRARY_PATH=build-asan/lib ./build-asan/afl_lora_rx_harness_asan fuzz/cras
 - Usa semillas IQ válidas para aumentar cobertura real dentro de `frame_sync` y los decodificadores.
 - Si GNU Radio intenta crear buffers temporales y el entorno restringe `/var/tmp`, ejecuta AFL++ fuera del sandbox o ajusta la configuración de buffers de GNU Radio de tu sistema.
 - En macOS, `DYLD_LIBRARY_PATH` puede ser necesario si no instalas la librería.
-

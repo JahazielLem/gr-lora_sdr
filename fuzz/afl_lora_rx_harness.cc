@@ -37,7 +37,7 @@ namespace {
 constexpr uint32_t kCenterFreq = 868100000;
 constexpr uint32_t kBandwidth = 125000;
 constexpr uint8_t kOversampling = 4;
-constexpr uint32_t kMaxSamples = 1u << 15;
+constexpr uint32_t kMaxSamples = 1u << 13;
 
 std::vector<uint8_t> read_input(const char* path)
 {
@@ -85,6 +85,11 @@ int run_rx_chain(const std::vector<uint8_t>& input)
 
     auto samples = bytes_to_iq(input);
     if (samples.empty()) {
+        return 0;
+    }
+
+    const size_t samples_per_symbol = (1u << sf) * kOversampling;
+    if (samples.size() < samples_per_symbol) {
         return 0;
     }
 
