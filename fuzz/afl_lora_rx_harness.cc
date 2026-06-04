@@ -32,9 +32,7 @@
 #include <gnuradio/lora_sdr/header_decoder.h>
 #include <gnuradio/top_block.h>
 
-#ifdef __AFL_HAVE_MANUAL_CONTROL
-extern "C" void __AFL_INIT(void);
-#else
+#ifndef __AFL_INIT
 static inline void __AFL_INIT(void) {}
 #endif
 
