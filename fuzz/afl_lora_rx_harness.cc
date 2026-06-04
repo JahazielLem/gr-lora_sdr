@@ -32,6 +32,12 @@
 #include <gnuradio/lora_sdr/header_decoder.h>
 #include <gnuradio/top_block.h>
 
+#ifdef __AFL_HAVE_MANUAL_CONTROL
+extern "C" void __AFL_INIT(void);
+#else
+static inline void __AFL_INIT(void) {}
+#endif
+
 namespace {
 
 constexpr uint32_t kCenterFreq = 868100000;
@@ -133,6 +139,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    __AFL_INIT();
     const auto input = read_input(argv[1]);
     return run_rx_chain(input);
 }

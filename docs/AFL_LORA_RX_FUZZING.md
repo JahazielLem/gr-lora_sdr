@@ -34,6 +34,8 @@ bytes restantes     muestras IQ int8 intercaladas: I,Q,I,Q,...
 
 El objetivo principal es encontrar crashes, aborts, lecturas fuera de rango, escrituras fuera de rango y hangs en la cadena RX al recibir muestras corruptas o inesperadas. Para alcanzar estados más profundos, agrega al corpus capturas IQ de tramas LoRa válidas.
 
+El harness usa forkserver diferido con `__AFL_INIT()` para reducir bloqueos entre AFL++ y la inicialización del runtime de GNU Radio.
+
 ## Instalar AFL++
 
 macOS con Homebrew:
@@ -234,7 +236,27 @@ LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
   -- ./build-afl/afl_lora_rx_harness @@
 ```
 
-El sufijo `+` le permite a AFL++ manejar casos lentos sin clasificar automáticamente todo como crash. Si incluso con `-t 5000+` el dry-run se queda colgado, elimina temporalmente el seed lento del corpus y deja solo `minimal_iq.seed` hasta tener seeds IQ válidos más pequeños.
+El sufijo `+` le permite a AFL++ manejar casos lentos sin clasificar automáticamente todo como crash. Si incluso con `-t 5000+` el dry-run se queda colgado aunque el binario termine rápido fuera de AFL++, prueba sin forkserver:
+
+```bash
+AFL_NO_FORKSRV=1 AFL_SKIP_CPUFREQ=1 LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -t 5000+ \
+  -i fuzz/corpus \
+  -o fuzz/out \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+`AFL_NO_FORKSRV=1` es más lento, pero ayuda a confirmar que el bloqueo viene de la interacción entre forkserver y GNU Radio, no del corpus. Para ver más detalle del dry-run:
+
+```bash
+AFL_DEBUG=1 AFL_SKIP_CPUFREQ=1 LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -t 5000+ \
+  -i fuzz/corpus \
+  -o fuzz/out-debug \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+Si `AFL_NO_FORKSRV=1` funciona, úsalo para campañas cortas o divide el harness en bloques RX más pequeños para recuperar velocidad.
 
 ## Corpus recomendado
 
