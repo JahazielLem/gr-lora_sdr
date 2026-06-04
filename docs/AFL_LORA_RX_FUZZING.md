@@ -269,6 +269,24 @@ fuzz/corpus/noise_iq.seed
 
 Para mejorar cobertura, agrega capturas IQ de tramas válidas generadas por el TX. AFL++ funciona mucho mejor cuando el corpus inicial contiene entradas que pasan por sincronización, demodulación y decodificación.
 
+También puedes generar un corpus IQ sintético más profundo que las semillas mínimas:
+
+```bash
+python3 fuzz/make_iq_seed_corpus.py -o fuzz/corpus_iq --sf 7 --symbols 24
+```
+
+Luego úsalo como entrada de AFL++:
+
+```bash
+AFL_NO_FORKSRV=1 AFL_SKIP_CPUFREQ=1 LD_LIBRARY_PATH=build-afl/lib afl-fuzz \
+  -t 200+ \
+  -i fuzz/corpus_iq \
+  -o fuzz/out-iq \
+  -- ./build-afl/afl_lora_rx_harness @@
+```
+
+Este corpus no reemplaza tramas LoRa reales, pero fuerza al harness a procesar entradas con tamaño suficiente para entrar en la cadena RX y suele producir más cobertura que `minimal_iq.seed`.
+
 Formato esperado para una semilla IQ:
 
 ```text
@@ -366,3 +384,22 @@ DYLD_LIBRARY_PATH=build-asan/lib ./build-asan/afl_lora_rx_harness_asan fuzz/cras
 - Usa semillas IQ válidas para aumentar cobertura real dentro de `frame_sync` y los decodificadores.
 - Si GNU Radio intenta crear buffers temporales y el entorno restringe `/var/tmp`, ejecuta AFL++ fuera del sandbox o ajusta la configuración de buffers de GNU Radio de tu sistema.
 - En macOS, `DYLD_LIBRARY_PATH` puede ser necesario si no instalas la librería.
+
+## Criterio para darlo por terminado
+
+Puedes considerar una campaña básica terminada si:
+
+- AFL++ completó al menos varios ciclos sin crashes ni hangs guardados.
+- `stability` se mantiene cerca de 100%.
+- Repetiste la prueba con build normal instrumentado y con build ASAN/UBSAN.
+- Corriste al menos una campaña con seeds mínimos y otra con seeds IQ largos o tramas válidas.
+
+Para una validación más fuerte, deja correr AFL++ varias horas o una noche completa y conserva:
+
+```bash
+fuzz/out/default/fuzzer_stats
+fuzz/out/default/plot_data
+fuzz/out/default/queue
+```
+
+Si después de eso `saved crashes` y `saved hangs` siguen en cero, puedes reportarlo como “sin crashes encontrados bajo esta campaña y corpus”, no como prueba absoluta de ausencia de bugs.
