@@ -340,6 +340,76 @@ DYLD_LIBRARY_PATH=build-afl/lib afl-tmin \
   -- ./build-afl/afl_lora_rx_harness @@
 ```
 
+## Triage de crashes
+
+Cuando AFL++ reporta `saved crashes`, el siguiente paso es confirmar, minimizar y simbolizar. Para una campaña en `fuzz/out-iq`, lista los crashes:
+
+```bash
+ls -lh fuzz/out-iq/default/crashes
+```
+
+Reproduce primero con el harness instrumentado de AFL++:
+
+```bash
+for c in fuzz/out-iq/default/crashes/id:*; do
+  echo "===== $c ====="
+  LD_LIBRARY_PATH=build-afl/lib ./build-afl/afl_lora_rx_harness "$c"
+  echo "exit=$?"
+done
+```
+
+Después reproduce con ASAN/UBSAN:
+
+```bash
+mkdir -p fuzz/asan-reports
+for c in fuzz/out-iq/default/crashes/id:*; do
+  base="$(basename "$c")"
+  echo "===== $base ====="
+  ASAN_SYMBOLIZER_PATH="$(command -v llvm-symbolizer || true)" \
+  ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=1 \
+  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+  LD_LIBRARY_PATH=build-asan/lib \
+  ./build-asan/afl_lora_rx_harness_asan "$c" \
+    >"fuzz/asan-reports/${base}.log" 2>&1
+  grep -E "ERROR:|SUMMARY:|runtime error|#[0-9]+" "fuzz/asan-reports/${base}.log" | head -80
+done
+```
+
+Minimiza cada crash antes de depurarlo:
+
+```bash
+mkdir -p fuzz/minimized
+for c in fuzz/out-iq/default/crashes/id:*; do
+  out="fuzz/minimized/$(basename "$c").seed"
+  AFL_NO_FORKSRV=1 AFL_SKIP_CPUFREQ=1 LD_LIBRARY_PATH=build-afl/lib afl-tmin \
+    -t 5000+ \
+    -i "$c" \
+    -o "$out" \
+    -- ./build-afl/afl_lora_rx_harness @@
+done
+```
+
+Luego vuelve a correr ASAN contra los minimizados:
+
+```bash
+for c in fuzz/minimized/*.seed; do
+  echo "===== $c ====="
+  ASAN_SYMBOLIZER_PATH="$(command -v llvm-symbolizer || true)" \
+  ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=1 \
+  UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+  LD_LIBRARY_PATH=build-asan/lib \
+  ./build-asan/afl_lora_rx_harness_asan "$c"
+done
+```
+
+Agrupa duplicados comparando las líneas `SUMMARY`:
+
+```bash
+grep -h "SUMMARY:" fuzz/asan-reports/*.log | sort | uniq -c
+```
+
+Un crash es más probable que sea bug real si reproduce de forma estable con el harness AFL++, reproduce también con ASAN/UBSAN, el stack trace apunta a `lib/*.cc` de `gr-lora_sdr`, y el input minimizado sigue disparando el mismo stack trace.
+
 ## Sanitizers
 
 Para investigar una falla concreta, compila una versión con ASAN/UBSAN:
@@ -364,11 +434,26 @@ Compila el harness con las mismas flags:
 clang++ -std=c++17 \
   -fsanitize=address,undefined -fno-omit-frame-pointer \
   -Iinclude \
+  $(pkg-config --cflags gnuradio-runtime gnuradio-blocks fmt) \
+  fuzz/afl_lora_rx_harness.cc \
+  -Lbuild-asan/lib \
+  -lgnuradio-lora_sdr \
+  $(pkg-config --libs gnuradio-runtime gnuradio-blocks fmt) \
+  -o build-asan/afl_lora_rx_harness_asan
+```
+
+Si tu sistema no tiene archivo `pkg-config` para `fmt`, usa `-lfmt` al final:
+
+```bash
+clang++ -std=c++17 \
+  -fsanitize=address,undefined -fno-omit-frame-pointer \
+  -Iinclude \
   $(pkg-config --cflags gnuradio-runtime gnuradio-blocks) \
   fuzz/afl_lora_rx_harness.cc \
   -Lbuild-asan/lib \
   -lgnuradio-lora_sdr \
   $(pkg-config --libs gnuradio-runtime gnuradio-blocks) \
+  -lfmt \
   -o build-asan/afl_lora_rx_harness_asan
 ```
 
